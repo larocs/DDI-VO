@@ -4,7 +4,6 @@ import gluefactory as gf
 from timesformer.models.vit import VisionTransformer
 from functools import partial
 from collections import OrderedDict
-from voflowres import VOFlowRes
 from utils import get_patches, make_intrinsics_layer, get_sorted_matches
 
 
@@ -79,26 +78,33 @@ class ImagePairEncoder(nn.Module):
         )
         self.vit.head = torch.nn.Identity() #remove last linear layer
 
+        
         if config.vit.pretrained:
             checkpoint = torch.load(config.vit.pretrained_weights, map_location="cpu")
-            vo_regressor_state_dict = checkpoint['model_state_dict']
+            vo_regressor_state_dict = checkpoint['model_state_dict'] if 'model_state_dict' in checkpoint else checkpoint
 
             vit_state_dict = OrderedDict()
-            adapter_state_dict = OrderedDict()
 
             for key, value in vo_regressor_state_dict.items():
+                if key.startswith('module.'):
+                    key = key.replace('module.', '', 1)
+
+                # Extract ViT weights
                 if key.startswith('encoder.vit.'):
                     new_key = key.replace('encoder.vit.', '', 1)
                     vit_state_dict[new_key] = value
-                elif key.startswith('adapter.'):
-                    new_key = key.replace('adapter.', '', 1)
-                    adapter_state_dict[new_key] = value
-
-            # Load the filtered weights
-            self.vit.load_state_dict(vit_state_dict, strict=True)
-            self.adapter.load_state_dict(adapter_state_dict, strict=True)
-
-
+                elif key.startswith('vit.'):
+                    new_key = key.replace('vit.', '', 1)
+                    vit_state_dict[new_key] = value
+                elif key in self.vit.state_dict().keys():
+                    vit_state_dict[key] = value
+                
+            if len(vit_state_dict) > 0:
+                missing, unexpected = self.vit.load_state_dict(vit_state_dict, strict=False)
+                print(f"Successfully loaded {len(vit_state_dict)} keys into ViT.")
+            else:
+                print("WARNING: No matching keys found for ViT! Initializing from scratch.")
+                
         
     def forward(self, data):
         im0 = torch.clamp(data['view0']['image'], 0, 1)
@@ -134,7 +140,8 @@ class MotionEstimator(nn.Module):
     def forward(self, image_embs, patch_embs):
         query = image_embs.unsqueeze(0)
         key = value = patch_embs.permute(1, 0, 2)  # Swap batch and sequence dimensions
-        fused, _ = self.cross_attn(query, key, value)        
+        attn_output, _ = self.cross_attn(query, key, value)    
+        fused = attn_output + query    
         fused = fused.squeeze(0)
         
         return self.fc(fused)

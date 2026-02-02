@@ -42,6 +42,9 @@ default_train_conf = {
     "balanced_sampling": True,
     "lambda_t": 1.0,
     "lambda_r": 1.0,
+    "scheduler_patience": 5,
+    "scheduler_factor": 0.5,
+    "scheduler_min_lr": 1e-6,
 }
 default_train_conf = OmegaConf.create(default_train_conf)
 
@@ -127,7 +130,7 @@ def train_epoch(model, train_loader, criterion, optimizer, epoch, device, max_it
     return epoch_loss / max_iters 
 
 
-def train(model, train_loader, val_loader, optimizer, device, config):
+def train(model, train_loader, val_loader, optimizer, device, config, scheduler=None):
     criterion = pose_loss_norm
     writer = SummaryWriter(log_dir=config.train.tensorboard_dir)
     for epoch in range(config.train.epochs):
@@ -147,6 +150,12 @@ def train(model, train_loader, val_loader, optimizer, device, config):
         
         logger.info(f"Epoch {epoch}, Validation loss: {val_loss}")
         writer.add_scalar("val/loss", val_loss, epoch)
+        
+        if scheduler is not None:
+            scheduler.step(val_loss)
+            current_lr = optimizer.param_groups[0]['lr']
+            writer.add_scalar("train/learning_rate", current_lr, epoch)
+            logger.info(f"Current learning rate: {current_lr}")
         
         if val_loss < config.train.best_loss:
             config.train.best_loss = val_loss
@@ -215,10 +224,9 @@ def main(args):
         for param in model.imgenc.parameters():
             param.requires_grad = False
         logger.info(f"Unfreezing the last {conf.vit.unfreeze_last} layers of the ViT model")
-        
-        for param in model.imgenc.vit.blocks[-conf.vit.unfreeze_last:].parameters():
-            param.requires_grad = True
-            
+        if conf.vit.unfreeze_last > 0:
+            for param in model.imgenc.vit.blocks[-conf.vit.unfreeze_last:].parameters():
+                param.requires_grad = True            
         for param in model.imgenc.adapter.parameters(): 
             param.requires_grad = True
 
@@ -227,8 +235,16 @@ def main(args):
         for param in model.matcher.parameters():
             param.requires_grad = False 
 
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer,
+        mode='min',
+        factor=conf.train.scheduler_factor,
+        patience=conf.train.scheduler_patience,
+        min_lr=conf.train.scheduler_min_lr,
+    )
     logger.info(f"Training with dataset config {conf.data}")
-    train(model, train_loader, val_loader, optimizer, device, conf)
+    logger.info(f"Using ReduceLROnPlateau scheduler with patience={conf.train.scheduler_patience}, factor={conf.train.scheduler_factor}, min_lr={conf.train.scheduler_min_lr}")
+    train(model, train_loader, val_loader, optimizer, device, conf, scheduler=scheduler)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
