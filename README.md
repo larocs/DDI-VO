@@ -1,37 +1,89 @@
-# DDI-VO
+# DDI-VO: Deep Direct-Indirect Visual Odometry
 
-DDI-VO is a visual odometry model. This repository contains the code for training, testing, and running the model.
+[![PyTorch](https://img.shields.io/badge/PyTorch-%23EE4C2C.svg?style=flat&logo=PyTorch&logoColor=white)](#)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](#)
+
+DDI-VO is a hybrid 6-DoF Visual Odometry architecture that leverages a pure Vision Transformer (ViT) backbone to seamlessly integrate direct (photometric/global) and indirect (feature-based) tracking paradigms. By combining globally consistent representations with robust sparse tracking (SuperPoint + LightGlue), this model achieves strong generalization across diverse motion profiles including autonomous driving, aerial flight, and handheld scenarios.
+
+---
 
 ## Installation
 
-### 1. Clone the repository
+You can run DDI-VO either natively using a Python virtual environment or via Docker for guaranteed reproducibility.
 
-This repository uses Git submodules (such as `glue-factory` and others). To clone it properly, use the `--recursive` flag:
+### Option A: Docker
+We provide a `Dockerfile` that packages all required system dependencies, CUDA drivers, and Python libraries.
 
+1. Clone the repository with submodules:
 ```bash
-git clone --recursive <repository_url>
+git clone --recursive https://github.com/larocs/DDI-VO.git
 cd DDI-VO
 ```
 
-If you have already cloned the repository without the submodules, you can initialize them by running:
+2. Build the Docker image:
 
 ```bash
-git submodule update --init --recursive
+docker build -t ddi-vo .
 ```
 
-### 2. Install dependencies
+3. Run the container (mounting your local dataset folder):
 
-It is recommended to use a virtual environment (e.g., Python venv or Conda). Install the required Python packages with:
+```bash
+docker run --gpus all -it -v /path/to/your/local/datasets:/workspace/DDI-VO/datasets ddi-vo /bin/bash
+```
+
+### Option B: Local Setup (Conda / Venv)
+
+1. Clone the repository with submodules:
+
+```bash
+git clone --recursive https://github.com/larocs/DDI-VO.git
+cd DDI-VO
+```
+
+(If you already cloned without submodules, run: `git submodule update --init --recursive`)
+
+2. Install dependencies:
+Ensure you have PyTorch and Torchvision installed properly according to your CUDA version, then run:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-*(Note: Ensure you have PyTorch and Torchvision installed properly according to your CUDA version prior to installing the remaining requirements if needed).*
+## Dataset Preparation
+To use the default dataloaders (kitti.py, queenscamp.py, tartanair.py), your datasets must be strictly organized in the following hierarchy inside the datasets/ directory:
 
-### 3. Download Model Weights
+```Plaintext
+datasets/
+├── kitti/
+│   ├── sequences/
+│   │   ├── 00/
+│   │   │   ├── image_2/
+│   │   │   └── calib.txt
+│   │   └── 01/
+│   └── poses/
+│       ├── 00.txt
+│       └── 01.txt
+├── queenscamp/
+│   ├── rgb_camera_info.txt
+│   └── sequences/
+│       ├── 01/
+│       │   ├── images/
+│       │   └── traj.txt
+│       └── 02/
+└── tartanair/
+    ├── rgb_camera_info.txt
+    └── abandonedfactory/
+        ├── Easy/
+        │   ├── P000/
+        │   │   ├── image_left/
+        │   │   └── pose_left.txt
+        │   └── P001/
+        └── Hard/
+```
 
-To download the required pre-trained weights (e.g., for LightGlue / SuperPoint), run the provided shell script:
+## Model Weights
+DDI-VO requires pre-trained weights to run, which can be obtained as follows:
 
 ```bash
 chmod +x download_weights.sh
@@ -40,24 +92,27 @@ chmod +x download_weights.sh
 
 ## Usage
 
-### Testing / Inference
+### Training
+To train or fine-tune the model on the supported datasets, configure your parameters in configs/train_example.yaml and run:
 
-You can run the inference/testing script using `test.py`. An example command looks like:
+```bash
+python train.py checkpoints/ddi_vo_experiment \
+    --conf configs/train_example.yaml \
+    --use_cuda
+```
+
+### Testing / Inference
+To run inference and generate trajectory files (traj.txt) for evaluation against ground truth, run:
 
 ```bash
 python test.py \
     --dataset_config configs/ddi_vo.yaml \
     --model_config configs/ddi_vo_model.yaml \
-    --model_path checkpoints/best_model.tar \
+    --model_path checkpoints/ddi_vo_experiment/best_model.tar \
     --output_path results \
-    --trajectory_file traj.txt 
+    --trajectory_file traj.txt
 ```
-*(Make sure to adjust the config and checkpoint paths according to your local files).*
 
-### Training
 
-To train the model on datasets like KITTI, Queenscamp, or TartanAir, use the `train.py` script:
-
-```bash
-python train.py ddi_vo_experiment --config configs/train_example.yaml --use_cuda
-```
+## Other publications
+Check out our deep homography estimation visual transformer, which is available [here](https://github.com/larocs/deep-homography-vit).
