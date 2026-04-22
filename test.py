@@ -79,13 +79,6 @@ def main():
     checkpoint = torch.load(args.model_path, map_location='cuda')
     model.load_state_dict(checkpoint['model'], strict=False)
 
-    if args.enable_gui:
-        import numpy as np
-        from modvo.maps.kf_based import Frame
-        from modvo.gui.viewer import GUIDrawer
-        drawer = GUIDrawer()
-        frames = []
-    
     from modvo.utils.geometry import matrix_to_quaternion
     
     with open(args.dataset_config, 'r') as f:
@@ -112,15 +105,6 @@ def main():
             continue
         print('img ', image.shape)
         R, t = vo.track(image.copy())
-                
-        if args.enable_gui:
-            f = Frame(np.array(image))
-            frame_pose = np.eye(4)
-            frame_pose[:3,:3] = R
-            frame_pose[:3,3] = t.flatten()
-            f.pose = frame_pose
-            frames.append(f)
-            drawer.draw_trajectory(frames)
     
         if(dataloader.type == 'dataset'):
             i = dataloader.index
@@ -145,7 +129,6 @@ if __name__ == "__main__":
     parser.add_argument('--dataset_config', type=str, default='configs/ddi_vo.yaml', help='Path to dataset config file')
     parser.add_argument('--model_config', type=str, default='configs/ddi_vo_model.yaml', help='Path to model config file')
     parser.add_argument('--model_path', type=str, default='checkpoints/photovo.tar', help='Path to model checkpoint')
-    parser.add_argument('--enable_gui', action='store_true', help='Enable GUI for visualization')
     parser.add_argument('--output_path', type=str, default='results', help='Path to output directory')
     parser.add_argument('--trajectory_file', type=str, default='traj.txt', help='Path to output trajectory file')
     args = parser.parse_args()
