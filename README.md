@@ -3,6 +3,7 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-%23EE4C2C.svg?style=flat&logo=PyTorch&logoColor=white)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](#)
 
+This is the official repository of [Geometry-aware attention for robust visual odometry](https://ssrn.com/abstract=6732475). 
 DDI-VO is a hybrid 6-DoF Visual Odometry architecture that leverages a pure Vision Transformer (ViT) backbone to seamlessly integrate direct (photometric/global) and indirect (feature-based) tracking paradigms. By combining globally consistent representations with robust sparse tracking (SuperPoint + LightGlue), this model achieves strong generalization across diverse motion profiles including autonomous driving, aerial flight, and handheld scenarios.
 
 ---
@@ -113,6 +114,18 @@ python test.py \
     --trajectory_file traj.txt
 ```
 
+## Citation
+If you use this work, please cite our paper:
+```
+@article{Bruno2026,
+  author  = {Bruno, Hudson and Cabral, Kleber and Givigi, Sidney and Colombini, Esther},
+  title   = {Geometry-aware attention for robust visual odometry},
+  journal = {SSRN Electronic Journal},
+  doi     = {10.2139/ssrn.6732475},
+  year = 2026,
+  url     = {https://ssrn.com/abstract=6732475}
+}
+```
 
 ## Other publications
 Check out our deep homography estimation visual transformer, which is available [here](https://github.com/larocs/deep-homography-vit).
